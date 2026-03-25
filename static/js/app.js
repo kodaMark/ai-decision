@@ -338,7 +338,7 @@
 
   function pollStatus() {
     let attempts = 0;
-    const maxAttempts = 120; // 2 min max
+    const maxAttempts = 300; // 5 min max
 
     const interval = setInterval(() => {
       attempts++;

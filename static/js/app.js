@@ -109,8 +109,8 @@
 
   /* ---------- First message (cold start) ---------- */
   function fetchFirstMessage() {
-    // Send an empty "hello" to get GLM's opening message
-    sendMessage("你好，我需要做一个重要的决定，请帮助我。", false);
+    // Show hardcoded opening to ensure consistent single-question format
+    appendMessage("assistant", "你好！我是小决，专门帮你理清重要决定。\n\n你在考虑什么决定？用一句话告诉我就好。");
   }
 
   /* ---------- Send text message ---------- */

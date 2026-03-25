@@ -7,6 +7,7 @@ Run with:
 
 import json
 import os
+import queue
 import threading
 import uuid
 from functools import wraps
@@ -167,15 +168,40 @@ def session_message(session_id: int):
         full_response = []
         yield "data: " + json.dumps({"type": "start"}) + "\n\n"
 
-        try:
-            for chunk in chat_with_glm_stream(glm_messages):
-                full_response.append(chunk)
-                # Strip [NEXT] marker from display
-                display_chunk = chunk.replace("[NEXT]", "").lstrip()
+        chunk_queue: queue.Queue = queue.Queue()
+
+        def fetch_stream():
+            try:
+                for chunk in chat_with_glm_stream(glm_messages):
+                    chunk_queue.put(("chunk", chunk))
+            except Exception as e:
+                chunk_queue.put(("error", str(e)))
+            finally:
+                chunk_queue.put(("done", None))
+
+        threading.Thread(target=fetch_stream, daemon=True).start()
+
+        error_occurred = False
+        while True:
+            try:
+                item_type, item_value = chunk_queue.get(timeout=10)
+            except queue.Empty:
+                yield ": ping\n\n"  # keepalive，防止 Railway 代理30秒空闲断连
+                continue
+
+            if item_type == "chunk":
+                full_response.append(item_value)
+                display_chunk = item_value.replace("[NEXT]", "").lstrip()
                 if display_chunk:
                     yield "data: " + json.dumps({"type": "chunk", "content": display_chunk}) + "\n\n"
-        except Exception as e:
-            yield "data: " + json.dumps({"type": "error", "message": str(e)}) + "\n\n"
+            elif item_type == "error":
+                yield "data: " + json.dumps({"type": "error", "message": item_value}) + "\n\n"
+                error_occurred = True
+                break
+            elif item_type == "done":
+                break
+
+        if error_occurred:
             return
 
         assistant_text = "".join(full_response)

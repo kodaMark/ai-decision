@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}决策报告 — AI深度决策{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* Additional report-specific overrides */
+  body { background: var(--bg); }
+
+  @media print {
+    .report-top-bar .action-bar,
+    .report-top-bar .btn-share,
+    .report-top-bar .btn-pdf { display: none !important; }
+    .report-section { break-inside: avoid; }
+    body { background: #fff; color: #111; }
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="report-page" id="reportPage">
+
+  <!-- Top bar -->
+  <div class="report-top-bar">
+    <h1>✦ 决策分析报告</h1>
+    <div class="action-bar">
+      <button class="btn-share" id="shareBtn" type="button" title="分享报告">
+        <span>🔗</span> 分享
+      </button>
+      <button class="btn-pdf" id="pdfBtn" type="button" title="下载 PDF">
+        <span>⬇</span> PDF
+      </button>
+    </div>
+  </div>
+
+  {% if report and report.final_report_html %}
+    <!-- Render the server-generated report HTML -->
+    {{ report.final_report_html | safe }}
+
+  {% elif ds.status == 'error' %}
+    <div class="error-state">
+      <div class="error-icon">⚠️</div>
+      <p>分析过程中出现了问题，请稍后重试。</p>
+      {% if report and report.error_message %}
+        <p style="font-size:.8rem; color:var(--text3); margin-bottom:1.5rem;">
+          {{ report.error_message }}
+        </p>
+      {% endif %}
+      <a href="{{ url_for('session_view', session_id=ds.id) }}" class="btn-retry">
+        ← 返回对话
+      </a>
+    </div>
+
+  {% else %}
+    <!-- Still analyzing (should not happen normally, but fallback) -->
+    <div class="error-state">
+      <div class="error-icon">⏳</div>
+      <p>报告正在生成中，请稍候…</p>
+      <a href="{{ url_for('session_view', session_id=ds.id) }}" class="btn-retry">
+        ← 返回等待
+      </a>
+    </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div style="margin-top:3rem; text-align:center; color:var(--text3); font-size:.78rem; padding-bottom:1rem;">
+    <p>由 AI深度决策 生成 · Claude + GPT-4.5 + GLM 协同分析</p>
+    <p style="margin-top:.25rem;">报告仅供参考，最终决策权在你手中</p>
+    <p style="margin-top:1rem;">
+      <a href="{{ url_for('index') }}" style="color:var(--accent2);">分析一个新决定 →</a>
+    </p>
+  </div>
+
+</div>
+{% endblock %}

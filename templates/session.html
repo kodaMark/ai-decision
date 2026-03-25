@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}决策对话 — AI深度决策{% endblock %}
+
+{% block body %}
+<!-- App data passed from Flask -->
+<div id="appData"
+     data-session-id="{{ ds.id }}"
+     data-messages="{{ messages | tojson | e }}"
+     hidden>
+</div>
+
+<div class="session-layout">
+
+  <!-- Header -->
+  <header class="session-header">
+    <div class="logo-sm" aria-hidden="true">✦</div>
+    <div class="title-group">
+      <h2>AI深度决策</h2>
+      <div class="status-text" id="statusText">准备收集信息</div>
+    </div>
+  </header>
+
+  <!-- Step progress bar (9 dots) -->
+  <div class="step-progress" role="progressbar"
+       aria-label="信息收集进度" aria-valuemin="0" aria-valuemax="9">
+    {% for i in range(9) %}
+    <div class="step-dot" data-step="{{ i + 1 }}"></div>
+    {% endfor %}
+  </div>
+
+  <!-- Chat area -->
+  <section class="chat-area" id="chatArea" aria-live="polite" aria-label="对话区域">
+    {% for msg in messages %}
+    <div class="msg {{ msg.role }}">
+      <div class="msg-avatar">{{ '✦' if msg.role == 'assistant' else '你' }}</div>
+      <div class="msg-bubble">{{ msg.content }}</div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <!-- Input bar -->
+  <footer class="input-bar">
+    <!-- Toggle -->
+    <div class="input-toggle" role="group" aria-label="输入方式">
+      <button class="toggle-btn active" id="textToggle" type="button">文字输入</button>
+      <button class="toggle-btn" id="voiceToggle" type="button">语音输入</button>
+    </div>
+
+    <!-- Text input panel -->
+    <div id="textInputPanel">
+      <div class="text-input-row">
+        <textarea
+          id="msgTextarea"
+          placeholder="输入你的回答，按 Enter 发送…"
+          rows="1"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="消息输入框"
+        ></textarea>
+        <button class="btn-send" id="sendBtn" type="button" aria-label="发送">
+          ↑
+        </button>
+      </div>
+    </div>
+
+    <!-- Voice input panel (hidden by default) -->
+    <div id="voiceInputPanel" class="voice-input-panel hidden">
+      <button class="btn-record" id="recordBtn" type="button" aria-label="开始录音">
+        🎙
+      </button>
+      <p class="voice-status" id="voiceStatus">点击开始录音</p>
+      <div class="voice-preview" id="voicePreview" aria-live="polite"></div>
+      <button
+        class="btn-send"
+        id="sendVoiceBtn"
+        type="button"
+        style="display:none; width:auto; padding: 0 1.25rem;"
+        aria-label="发送语音识别结果"
+      >
+        发送
+      </button>
+    </div>
+  </footer>
+</div>
+
+<!-- Analyzing overlay -->
+<div class="analyzing-overlay hidden" id="analyzingOverlay" role="dialog"
+     aria-modal="true" aria-label="深度分析中">
+  <div class="orbit-spinner" aria-hidden="true"></div>
+
+  <h2 class="analyzing-title">正在为你深度推演…</h2>
+
+  <div class="analyzing-steps" role="list">
+    <div class="analyzing-step" role="listitem">
+      <span class="step-icon">◎</span>
+      <span>整理决策信息</span>
+    </div>
+    <div class="analyzing-step" role="listitem">
+      <span class="step-icon">◎</span>
+      <span>Claude 结构化分析</span>
+    </div>
+    <div class="analyzing-step" role="listitem">
+      <span class="step-icon">◎</span>
+      <span>GPT-4.5 推演三条路径</span>
+    </div>
+    <div class="analyzing-step" role="listitem">
+      <span class="step-icon">◎</span>
+      <span>Claude 量化评分矩阵</span>
+    </div>
+    <div class="analyzing-step" role="listitem">
+      <span class="step-icon">◎</span>
+      <span>生成最终建议报告</span>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap" role="progressbar"
+       aria-label="分析进度" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress-bar-inner" id="progressBar"></div>
+  </div>
+
+  <p style="color: var(--text3); font-size: .82rem;">预计需要 30–60 秒，请耐心等候</p>
+</div>
+
+{% endblock %}

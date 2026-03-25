@@ -1,0 +1,9 @@
+flask
+flask-sqlalchemy
+anthropic
+openai
+edge-tts
+python-dotenv
+requests
+gunicorn
+psycopg2-binary

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}AI深度决策 — 让每个重要决定都有迹可循{% endblock %}
+
+{% block body %}
+<main class="landing">
+  <div class="landing-logo" aria-hidden="true">✦</div>
+
+  <h1>AI深度决策</h1>
+  <p class="subtitle">
+    9个问题，5步推演，<br>
+    生成属于你的高质量决策报告
+  </p>
+
+  <div class="feature-list" role="list">
+    <div class="feature-item" role="listitem">
+      <span class="icon">🗣️</span>
+      <div>
+        <strong>语音 &amp; 文字输入</strong>
+        <span>随时说，随时写，无障碍表达</span>
+      </div>
+    </div>
+    <div class="feature-item" role="listitem">
+      <span class="icon">🧭</span>
+      <div>
+        <strong>智能引导对话</strong>
+        <span>小决陪你把复杂问题说清楚</span>
+      </div>
+    </div>
+    <div class="feature-item" role="listitem">
+      <span class="icon">🔬</span>
+      <div>
+        <strong>三模型深度推演</strong>
+        <span>Claude + GPT-4.5 + GLM 协同分析</span>
+      </div>
+    </div>
+    <div class="feature-item" role="listitem">
+      <span class="icon">📊</span>
+      <div>
+        <strong>结构化决策报告</strong>
+        <span>路径推演 · 评分矩阵 · 红线绿灯</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-start" id="startBtn" type="button">
+    <span>开始深度决策</span>
+    <span aria-hidden="true">→</span>
+  </button>
+
+  <p class="landing-footer">
+    平均耗时 3–5 分钟 · 数据仅用于本次分析
+  </p>
+</main>
+{% endblock %}

@@ -186,7 +186,7 @@ class ConversationSOP:
                 "语气要充满期待感，让用户感到即将收到有价值的洞见。"
             )
         else:
-            force_next = followup_count >= 2
+            force_next = followup_count >= 2 or current_q["step"] == 9
             extra_instruction = (
                 f"当前需要引导用户回答的问题方向：{current_q['glm_prompt']}\n"
                 f"这是第{current_q['step']}个问题（共9个）。\n"

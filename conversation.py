@@ -187,23 +187,41 @@ class ConversationSOP:
             )
         else:
             force_next = followup_count >= 2 or current_q["step"] == 9
+            # Find next question
+            next_q = None
+            for q in SOP_QUESTIONS:
+                if q["step"] == current_q["step"] + 1:
+                    next_q = q
+                    break
+
             if not conversation_history:
                 extra_instruction = "这是对话的开始，先热情打招呼，然后问第一个问题。"
             elif force_next:
-                extra_instruction = (
-                    f"【强制指令】无论用户回答是否完整，你必须：\n"
-                    f"1. 在回复开头加 [NEXT]\n"
-                    f"2. 用温暖的语气过渡\n"
-                    f"3. 接着问且只问这一个问题：「{current_q['question']}」\n"
-                    f"禁止问其他任何问题，禁止出现第二个问号。"
-                )
+                if next_q:
+                    extra_instruction = (
+                        f"用户已充分回答了当前问题，必须推进。\n"
+                        f"在回复开头加 [NEXT]，用温暖自然的语气做简短过渡，"
+                        f"然后问下一个问题（核心是：{next_q['question']}）。\n"
+                        f"语气要像朋友聊天，不要死板，但只能问这一个问题。"
+                    )
+                else:
+                    extra_instruction = (
+                        "所有问题已收集完毕，在回复开头加 [NEXT]，"
+                        "告诉用户信息收集完成，即将开始深度分析。"
+                    )
             else:
-                extra_instruction = (
-                    f"【当前任务】判断用户的回答是否足够具体：\n"
-                    f"- 如果具体：在回复开头加 [NEXT]，然后问且只问这一个问题：「{current_q['question']}」\n"
-                    f"- 如果模糊：不加 [NEXT]，针对「{current_q['question']}」这个话题追问一个具体的细节\n"
-                    f"禁止问其他话题，禁止出现两个或以上的问号。"
-                )
+                if next_q:
+                    extra_instruction = (
+                        f"判断用户对「{current_q['question']}」的回答是否足够具体：\n"
+                        f"- 答案具体：在回复开头加 [NEXT]，自然过渡后问下一个问题（核心是：{next_q['question']}）\n"
+                        f"- 答案模糊：不加 [NEXT]，针对「{current_q['question']}」追问一个具体细节\n"
+                        f"语气要自然温暖，只能出现一个问号。"
+                    )
+                else:
+                    extra_instruction = (
+                        "判断回答是否具体，若具体则加 [NEXT] 告知信息收集完成；"
+                        "否则针对当前话题追问细节。"
+                    )
 
         system = SYSTEM_PROMPT_GLM + "\n\n[当前引导指令]\n" + extra_instruction
 

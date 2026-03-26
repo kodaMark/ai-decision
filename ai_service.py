@@ -4,7 +4,7 @@ Multi-model AI service for AI深度决策.
 Models used:
 - 豆包 Lite (字节跳动): SOP conversation guidance (cheap)
 - Claude claude-opus-4-6 (Anthropic): Step 2, Step 4, Step 5
-- GPT-4.5 via relay: Step 3
+- GPT-5.4 via Qiniu relay (openai/gpt-5.4): Step 3, fallback to Claude Sonnet
 - 讯飞 STT: speech-to-text (placeholder)
 - Edge TTS (Microsoft, free): text-to-speech
 """
@@ -23,12 +23,40 @@ from openai import OpenAI
 # ---------------------------------------------------------------------------
 
 
-def _get_anthropic_client() -> anthropic.Anthropic:
-    kwargs = {"api_key": os.environ["ANTHROPIC_API_KEY"]}
-    base_url = os.environ.get("ANTHROPIC_BASE_URL")
+def _get_anthropic_client(use_backup: bool = False) -> anthropic.Anthropic:
+    """Return Anthropic client. use_backup=True switches to backup key from DB/env."""
+    try:
+        from models import APIConfig
+        if use_backup:
+            api_key = APIConfig.get("backup_api_key") or os.environ.get("BACKUP_API_KEY", "")
+            base_url = APIConfig.get("backup_base_url") or os.environ.get("BACKUP_BASE_URL", "")
+        else:
+            api_key = APIConfig.get("primary_api_key") or os.environ.get("ANTHROPIC_API_KEY", "")
+            base_url = APIConfig.get("primary_base_url") or os.environ.get("ANTHROPIC_BASE_URL", "")
+    except Exception:
+        # Outside app context: fall back to env vars
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+
+    kwargs = {"api_key": api_key}
     if base_url:
         kwargs["base_url"] = base_url
     return anthropic.Anthropic(**kwargs)
+
+
+def _anthropic_call_with_fallback(fn, *args, **kwargs):
+    """Call fn(client, *args, **kwargs) with primary key; retry with backup on failure."""
+    try:
+        return fn(_get_anthropic_client(use_backup=False), *args, **kwargs)
+    except Exception as e:
+        try:
+            from models import APIConfig
+            has_backup = bool(APIConfig.get("backup_api_key") or os.environ.get("BACKUP_API_KEY"))
+        except Exception:
+            has_backup = bool(os.environ.get("BACKUP_API_KEY"))
+        if has_backup:
+            return fn(_get_anthropic_client(use_backup=True), *args, **kwargs)
+        raise
 
 
 def _get_openai_client() -> OpenAI:
@@ -55,12 +83,10 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
     """
     Stream SOP conversation response token by token via Claude Haiku.
     messages: list of {"role": ..., "content": ...} including system message.
-    Yields text chunks.
+    Yields text chunks. Automatically falls back to backup key on failure.
     """
-    client = _get_anthropic_client()
     model = os.environ.get("SOP_MODEL", "claude-haiku-4-5-20251001")
 
-    # Split system message from conversation history
     system_content = ""
     conv_messages = []
     for m in messages:
@@ -69,7 +95,8 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
         else:
             conv_messages.append(m)
 
-    try:
+    def _stream(client):
+        chunks = []
         with client.messages.stream(
             model=model,
             max_tokens=300,
@@ -77,7 +104,13 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
             messages=conv_messages,
         ) as stream:
             for text in stream.text_stream:
-                yield text
+                chunks.append(text)
+        return chunks
+
+    try:
+        chunks = _anthropic_call_with_fallback(_stream)
+        for chunk in chunks:
+            yield chunk
     except Exception as e:
         yield f"\n（抱歉，网络出现了小问题，请重试。错误：{e}）"
 
@@ -176,10 +209,10 @@ STEP3_SYSTEM = """你是一位战略顾问，专门帮助人们发现决策的�
 
 def run_step3_gpt(collected_info: str, step2_result: dict) -> dict:
     """
-    Claude Sonnet generates three alternative pathways (GPT-4.5 unavailable via relay).
+    GPT-5.4 via Qiniu relay generates three alternative pathways.
+    Falls back to Claude Sonnet if OpenAI call fails.
     Returns parsed dict.
     """
-    client = _get_anthropic_client()
     step2_text = json.dumps(step2_result, ensure_ascii=False, indent=2)
     prompt = (
         f"用户决策信息：\n\n{collected_info}\n\n"
@@ -187,18 +220,34 @@ def run_step3_gpt(collected_info: str, step2_result: dict) -> dict:
         "请设计3条截然不同的行动路径。"
     )
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2500,
-        system=STEP3_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    raw_text = ""
-    for block in response.content:
-        if block.type == "text":
-            raw_text = block.text
-            break
+    try:
+        client = OpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        )
+        response = client.chat.completions.create(
+            model="openai/gpt-5.4",
+            max_tokens=2500,
+            messages=[
+                {"role": "system", "content": STEP3_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw_text = response.choices[0].message.content or ""
+    except Exception:
+        # Fallback to Claude Sonnet
+        client = _get_anthropic_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2500,
+            system=STEP3_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw_text = ""
+        for block in response.content:
+            if block.type == "text":
+                raw_text = block.text
+                break
 
     return _parse_json_safe(raw_text, default_key="raw", label="Step3")
 

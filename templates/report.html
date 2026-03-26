@@ -61,12 +61,41 @@
     </div>
   {% endif %}
 
+  {% if report %}
+  <!-- Step feedback -->
+  <div id="feedbackSection" style="max-width:600px;margin:2.5rem auto 0;padding:0 1rem;">
+    <h3 style="font-size:.95rem;color:var(--text2,#555);margin-bottom:16px;">这份报告对你有帮助吗？给每个环节打个分</h3>
+    {% set step_names = [(2,'结构化分析'),(3,'三条路径推演'),(4,'量化评分矩阵'),(5,'最终建议')] %}
+    {% for step_num, step_label in step_names %}
+    <div class="fb-row" data-step="{{ step_num }}"
+         style="border:1px solid var(--border,#eee);border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+      <div style="font-size:.88rem;font-weight:500;margin-bottom:8px;">Step{{ step_num }} · {{ step_label }}</div>
+      <div class="star-group" style="margin-bottom:8px;">
+        {% for i in range(1,6) %}
+        <span class="star" data-val="{{ i }}"
+              style="font-size:1.4rem;cursor:pointer;color:#ddd;user-select:none;">★</span>
+        {% endfor %}
+        <span class="fb-saved" style="font-size:.78rem;color:#6a6;margin-left:8px;display:none;">已保存</span>
+      </div>
+      <textarea class="fb-comment" placeholder="说说哪里好或哪里不足（可选）"
+                style="width:100%;padding:7px 10px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.85rem;resize:vertical;box-sizing:border-box;display:none;"></textarea>
+      <button class="fb-submit" type="button"
+              style="margin-top:8px;padding:6px 16px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:6px;font-size:.83rem;cursor:pointer;display:none;">
+        提交
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <!-- Footer -->
-  <div style="margin-top:3rem; text-align:center; color:var(--text3); font-size:.78rem; padding-bottom:1rem;">
-    <p>由 AI深度决策 生成 · Claude + GPT-4.5 + GLM 协同分析</p>
+  <div style="margin-top:2rem; text-align:center; color:var(--text3); font-size:.78rem; padding-bottom:2rem;">
+    <p>由 AI深度决策 生成 · Claude + GPT-5.4 协同分析</p>
     <p style="margin-top:.25rem;">报告仅供参考，最终决策权在你手中</p>
     <p style="margin-top:1rem;">
       <a href="{{ url_for('index') }}" style="color:var(--accent2);">分析一个新决定 →</a>
+      &nbsp;·&nbsp;
+      <a href="{{ url_for('support') }}" style="color:var(--accent2);">联系客服</a>
     </p>
   </div>
 

@@ -200,7 +200,7 @@ class ConversationSOP:
             if not conversation_history:
                 extra_instruction += "这是第一条消息，先热情地打招呼，然后问第一个问题。"
             else:
-                extra_instruction += "根据答案质量决定是否加 [NEXT]，参考系统提示中的判断标准。"
+                extra_instruction += "根据答案质量决定是否加 [NEXT]，参考系统提示中的判断标准。\n【本条强制】你的回复里只能出现一个问号，违反此规则视为错误输出。"
 
         system = SYSTEM_PROMPT_GLM + "\n\n[当前引导指令]\n" + extra_instruction
 

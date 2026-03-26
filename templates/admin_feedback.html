@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}评分反馈 — 后台{% endblock %}
+{% block body %}
+<div style="max-width:700px;margin:40px auto;padding:0 20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h2 style="font-size:1.1rem;margin:0;">用户评分反馈</h2>
+    <div style="font-size:.85rem;">
+      <a href="{{ url_for('admin_dashboard') }}" style="color:var(--text3,#999);margin-right:16px;">API配置</a>
+      <a href="{{ url_for('admin_support') }}" style="color:var(--text3,#999);margin-right:16px;">客服工单</a>
+      <a href="{{ url_for('admin_logout') }}" style="color:var(--text3,#999);">退出</a>
+    </div>
+  </div>
+
+  <!-- Step averages -->
+  {% set step_names = {2: 'Step2 结构化分析', 3: 'Step3 三条路径', 4: 'Step4 量化评分', 5: 'Step5 最终建议'} %}
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:28px;">
+    {% for step in [2,3,4,5] %}
+    <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:14px;">
+      <div style="font-size:.82rem;color:var(--text3,#999);margin-bottom:4px;">{{ step_names[step] }}</div>
+      <div style="font-size:1.4rem;font-weight:600;">
+        {% if step_stats[step]['count'] %}
+          {{ averages[step] }} <span style="font-size:.85rem;color:var(--text3,#999);">/ 5</span>
+        {% else %}
+          <span style="font-size:.9rem;color:var(--text3,#999);">暂无数据</span>
+        {% endif %}
+      </div>
+      <div style="font-size:.8rem;color:var(--text3,#999);">{{ step_stats[step]['count'] }} 条评分</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- All feedbacks -->
+  {% if not feedbacks %}
+  <p style="color:var(--text3,#999);">暂无反馈</p>
+  {% endif %}
+
+  {% for f in feedbacks %}
+  <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:14px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text3,#999);margin-bottom:6px;">
+      <span>{{ step_names.get(f.step, 'Step' ~ f.step) }} · Session {{ f.session_id }}</span>
+      <span>{{ f.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+    </div>
+    <div style="margin-bottom:4px;">
+      {% for i in range(1,6) %}
+        <span style="color:{% if i <= f.rating %}#f5a623{% else %}#ddd{% endif %};">★</span>
+      {% endfor %}
+      <span style="font-size:.85rem;color:var(--text3,#999);margin-left:6px;">{{ f.rating }}/5</span>
+    </div>
+    {% if f.comment %}
+    <p style="font-size:.9rem;margin:6px 0 0;white-space:pre-wrap;">{{ f.comment }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

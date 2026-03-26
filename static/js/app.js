@@ -66,6 +66,8 @@
     scrollToBottom();
   }
 
+  const $undoBtn = document.getElementById("undoBtn");
+
   function bindEvents() {
     if ($textToggle)     $textToggle.addEventListener("click",  () => setInputMode("text"));
     if ($voiceToggle)    $voiceToggle.addEventListener("click", () => setInputMode("voice"));
@@ -74,6 +76,35 @@
     if ($textarea)       $textarea.addEventListener("input",    autoResizeTextarea);
     if ($recordBtn)      $recordBtn.addEventListener("click",   toggleRecording);
     if ($sendVoiceBtn)   $sendVoiceBtn.addEventListener("click", sendVoiceMessage);
+    if ($undoBtn)        $undoBtn.addEventListener("click",     undoLastStep);
+  }
+
+  function undoLastStep() {
+    if (state.isSending || state.isAnalyzing) return;
+    fetch(`/session/${state.sessionId}/undo`, { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) { showToast(data.error); return; }
+        // Remove the last two messages (user + assistant) from the UI
+        const msgs = $chatArea.querySelectorAll(".msg");
+        // Remove messages until we've removed the user message for the undone step
+        let removed = 0;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          msgs[i].remove();
+          removed++;
+          if (msgs[i].classList.contains("user")) break;
+        }
+        // Update step progress
+        state.answeredSteps = state.answeredSteps.filter((s) => s !== data.step);
+        updateStepProgress();
+        // Prefill textarea with previous answer
+        if ($textarea) {
+          $textarea.value = data.previous_content;
+          autoResizeTextarea();
+          $textarea.focus();
+        }
+      })
+      .catch(() => showToast("返回失败，请重试"));
   }
 
   /* ---------- Input mode toggle ---------- */
@@ -518,10 +549,53 @@
 
     if (pdfBtn) {
       pdfBtn.addEventListener("click", () => {
-        // TODO: integrate server-side PDF generation or use window.print()
         showToast("PDF 导出功能即将上线");
       });
     }
+
+    // Step feedback
+    const sessionMatch = window.location.pathname.match(/\/session\/(\d+)/);
+    const feedbackSessionId = sessionMatch ? parseInt(sessionMatch[1], 10) : null;
+
+    document.querySelectorAll(".fb-row").forEach((row) => {
+      const step = parseInt(row.dataset.step, 10);
+      const stars = row.querySelectorAll(".star");
+      const commentEl = row.querySelector(".fb-comment");
+      const submitBtn = row.querySelector(".fb-submit");
+      const savedEl = row.querySelector(".fb-saved");
+      let selectedRating = 0;
+
+      stars.forEach((star) => {
+        star.addEventListener("mouseenter", () => {
+          const val = parseInt(star.dataset.val);
+          stars.forEach((s) => s.style.color = parseInt(s.dataset.val) <= val ? "#f5a623" : "#ddd");
+        });
+        star.addEventListener("mouseleave", () => {
+          stars.forEach((s) => s.style.color = parseInt(s.dataset.val) <= selectedRating ? "#f5a623" : "#ddd");
+        });
+        star.addEventListener("click", () => {
+          selectedRating = parseInt(star.dataset.val);
+          stars.forEach((s) => s.style.color = parseInt(s.dataset.val) <= selectedRating ? "#f5a623" : "#ddd");
+          commentEl.style.display = "block";
+          submitBtn.style.display = "inline-block";
+        });
+      });
+
+      submitBtn.addEventListener("click", () => {
+        if (!selectedRating || !feedbackSessionId) return;
+        fetch(`/session/${feedbackSessionId}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ step, rating: selectedRating, comment: commentEl.value }),
+        })
+          .then((r) => r.json())
+          .then(() => {
+            submitBtn.style.display = "none";
+            savedEl.style.display = "inline";
+          })
+          .catch(() => showToast("提交失败，请重试"));
+      });
+    });
   }
 
   /* ---------- Toast ---------- */

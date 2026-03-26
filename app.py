@@ -27,7 +27,7 @@ from flask import (
 
 load_dotenv()
 
-from models import ConversationMessage, DecisionReport, DecisionSession, db
+from models import APIConfig, ConversationMessage, DecisionReport, DecisionSession, StepFeedback, SupportTicket, db
 from conversation import ConversationSOP
 from ai_service import chat_with_glm_stream, generate_full_report, xfyun_stt
 
@@ -405,6 +405,195 @@ def api_stt():
         return jsonify({"error": str(e), "placeholder": True}), 501
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Undo (return to previous question)
+# ---------------------------------------------------------------------------
+
+
+@app.route("/session/<int:session_id>/undo", methods=["POST"])
+def session_undo(session_id: int):
+    """Delete messages from the last answered step onwards, return previous answer."""
+    ds = _get_decision_session(session_id)
+    if ds.status != "collecting":
+        return jsonify({"error": "Cannot undo after collection is complete"}), 400
+
+    # Find the last user message with a step recorded
+    last_answered = (
+        ConversationMessage.query
+        .filter_by(session_id=session_id, role="user")
+        .filter(ConversationMessage.step.isnot(None))
+        .order_by(ConversationMessage.id.desc())
+        .first()
+    )
+
+    if not last_answered:
+        return jsonify({"error": "Nothing to undo"}), 400
+
+    previous_content = last_answered.content
+    previous_step = last_answered.step
+
+    # Delete this message and everything after it
+    ConversationMessage.query.filter(
+        ConversationMessage.session_id == session_id,
+        ConversationMessage.id >= last_answered.id
+    ).delete()
+    db.session.commit()
+
+    return jsonify({"previous_content": previous_content, "step": previous_step})
+
+
+# ---------------------------------------------------------------------------
+# Admin panel
+# ---------------------------------------------------------------------------
+
+
+def _admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("admin_logged_in"):
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        admin_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
+        if password == admin_pw:
+            session["admin_logged_in"] = True
+            return redirect(url_for("admin_dashboard"))
+        error = "密码错误"
+    return render_template("admin_login.html", error=error)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_logged_in", None)
+    return redirect(url_for("admin_login"))
+
+
+@app.route("/admin", methods=["GET", "POST"])
+@_admin_required
+def admin_dashboard():
+    message = None
+    if request.method == "POST":
+        for key in ["primary_api_key", "primary_base_url", "backup_api_key", "backup_base_url"]:
+            value = request.form.get(key, "").strip()
+            if value:
+                APIConfig.set(key, value)
+        message = "保存成功"
+
+    config = {
+        "primary_api_key": APIConfig.get("primary_api_key", ""),
+        "primary_base_url": APIConfig.get("primary_base_url", ""),
+        "backup_api_key": APIConfig.get("backup_api_key", ""),
+        "backup_base_url": APIConfig.get("backup_base_url", ""),
+    }
+    return render_template("admin.html", config=config, message=message)
+
+
+# ---------------------------------------------------------------------------
+# Step feedback
+# ---------------------------------------------------------------------------
+
+
+@app.route("/session/<int:session_id>/feedback", methods=["POST"])
+def session_feedback(session_id: int):
+    _get_decision_session(session_id)  # 404 if not found
+    data = request.get_json(silent=True) or {}
+    step = data.get("step")
+    rating = data.get("rating")
+    comment = (data.get("comment") or "").strip()
+
+    if step not in (2, 3, 4, 5) or rating not in (1, 2, 3, 4, 5):
+        return jsonify({"error": "Invalid step or rating"}), 400
+
+    # Upsert: one feedback per session per step
+    existing = StepFeedback.query.filter_by(session_id=session_id, step=step).first()
+    if existing:
+        existing.rating = rating
+        existing.comment = comment
+    else:
+        db.session.add(StepFeedback(
+            session_id=session_id, step=step, rating=rating, comment=comment
+        ))
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Customer support
+# ---------------------------------------------------------------------------
+
+
+@app.route("/support", methods=["GET", "POST"])
+def support():
+    uid = _get_or_create_user_session_id()
+    ticket = None
+    if request.method == "POST":
+        question = (request.form.get("question") or "").strip()
+        contact = (request.form.get("contact") or "").strip()
+        if question:
+            t = SupportTicket(user_session_id=uid, question=question, contact=contact)
+            db.session.add(t)
+            db.session.commit()
+            ticket = t
+    # Show latest ticket for this user
+    latest = (SupportTicket.query
+              .filter_by(user_session_id=uid)
+              .order_by(SupportTicket.created_at.desc())
+              .first())
+    return render_template("support.html", submitted_ticket=ticket, latest=latest)
+
+
+# ---------------------------------------------------------------------------
+# Admin: support + feedback
+# ---------------------------------------------------------------------------
+
+
+@app.route("/admin/support", methods=["GET", "POST"])
+@_admin_required
+def admin_support():
+    if request.method == "POST":
+        ticket_id = request.form.get("ticket_id", type=int)
+        reply_text = (request.form.get("reply") or "").strip()
+        if ticket_id and reply_text:
+            t = SupportTicket.query.get_or_404(ticket_id)
+            t.reply = reply_text
+            t.status = "replied"
+            from datetime import datetime
+            t.replied_at = datetime.utcnow()
+            db.session.commit()
+
+    tickets = SupportTicket.query.order_by(SupportTicket.created_at.desc()).all()
+    return render_template("admin_support.html", tickets=tickets)
+
+
+@app.route("/admin/feedback")
+@_admin_required
+def admin_feedback():
+    feedbacks = (StepFeedback.query
+                 .order_by(StepFeedback.created_at.desc())
+                 .all())
+    # Compute average per step
+    from collections import defaultdict
+    step_stats = defaultdict(lambda: {"count": 0, "total": 0, "comments": []})
+    for f in feedbacks:
+        step_stats[f.step]["count"] += 1
+        step_stats[f.step]["total"] += f.rating
+        if f.comment:
+            step_stats[f.step]["comments"].append(f.comment)
+    averages = {
+        step: round(v["total"] / v["count"], 1) if v["count"] else 0
+        for step, v in step_stats.items()
+    }
+    return render_template("admin_feedback.html", feedbacks=feedbacks,
+                           step_stats=step_stats, averages=averages)
 
 
 # ---------------------------------------------------------------------------

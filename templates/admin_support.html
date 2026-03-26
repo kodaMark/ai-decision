@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}客服管理 — 后台{% endblock %}
+{% block body %}
+<div style="max-width:700px;margin:40px auto;padding:0 20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h2 style="font-size:1.1rem;margin:0;">客服工单</h2>
+    <div style="font-size:.85rem;">
+      <a href="{{ url_for('admin_dashboard') }}" style="color:var(--text3,#999);margin-right:16px;">API配置</a>
+      <a href="{{ url_for('admin_feedback') }}" style="color:var(--text3,#999);margin-right:16px;">评分反馈</a>
+      <a href="{{ url_for('admin_logout') }}" style="color:var(--text3,#999);">退出</a>
+    </div>
+  </div>
+
+  {% if not tickets %}
+  <p style="color:var(--text3,#999);">暂无工单</p>
+  {% endif %}
+
+  {% for t in tickets %}
+  <div style="border:1px solid var(--border,#ddd);border-radius:10px;padding:16px;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text3,#999);margin-bottom:8px;">
+      <span>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+      <span style="color:{% if t.status == 'replied' %}#6a6{% else %}#e96{% endif %};">
+        {{ '已回复' if t.status == 'replied' else '待回复' }}
+      </span>
+    </div>
+    {% if t.contact %}
+    <p style="font-size:.82rem;color:var(--text3,#999);margin-bottom:6px;">联系方式：{{ t.contact }}</p>
+    {% endif %}
+    <p style="margin-bottom:12px;white-space:pre-wrap;">{{ t.question }}</p>
+
+    {% if t.reply %}
+    <div style="background:var(--surface,#f5f5f5);border-radius:6px;padding:10px 12px;font-size:.88rem;margin-bottom:10px;white-space:pre-wrap;">
+      <span style="color:var(--text3,#999);font-size:.8rem;">你的回复：</span><br>{{ t.reply }}
+    </div>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="ticket_id" value="{{ t.id }}">
+      <textarea name="reply" rows="2" placeholder="输入回复…"
+                style="width:100%;padding:8px 10px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.9rem;resize:vertical;box-sizing:border-box;margin-bottom:8px;">{{ t.reply or '' }}</textarea>
+      <button type="submit"
+              style="padding:7px 18px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:6px;font-size:.88rem;cursor:pointer;">
+        {{ '更新回复' if t.reply else '发送回复' }}
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}管理后台 — API Key 配置{% endblock %}
+{% block body %}
+<div style="max-width:560px;margin:60px auto;padding:0 20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+    <h2 style="font-size:1.2rem;margin:0;">API Key 配置</h2>
+    <div style="font-size:.85rem;">
+      <a href="{{ url_for('admin_support') }}" style="color:var(--text3,#999);margin-right:16px;">客服工单</a>
+      <a href="{{ url_for('admin_feedback') }}" style="color:var(--text3,#999);margin-right:16px;">评分反馈</a>
+      <a href="{{ url_for('admin_logout') }}" style="color:var(--text3,#999);">退出</a>
+    </div>
+  </div>
+
+  {% if message %}
+  <div style="background:#efffef;border:1px solid #6c6;color:#363;padding:10px 14px;border-radius:8px;margin-bottom:20px;">
+    {{ message }}
+  </div>
+  {% endif %}
+
+  <form method="POST">
+    <div style="margin-bottom:24px;">
+      <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--text2,#555);">主 API（当前：七牛云）</h3>
+      <label style="display:block;font-size:.85rem;margin-bottom:4px;">API Key</label>
+      <input type="text" name="primary_api_key"
+             value="{{ config.primary_api_key }}"
+             placeholder="sk-..."
+             style="width:100%;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.9rem;margin-bottom:10px;box-sizing:border-box;">
+      <label style="display:block;font-size:.85rem;margin-bottom:4px;">Base URL</label>
+      <input type="text" name="primary_base_url"
+             value="{{ config.primary_base_url }}"
+             placeholder="https://api.qnaigc.com/v1"
+             style="width:100%;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.9rem;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:28px;">
+      <h3 style="font-size:.95rem;margin-bottom:12px;color:var(--text2,#555);">备用 API（主 Key 失败时自动切换）</h3>
+      <label style="display:block;font-size:.85rem;margin-bottom:4px;">API Key</label>
+      <input type="text" name="backup_api_key"
+             value="{{ config.backup_api_key }}"
+             placeholder="sk-ant-..."
+             style="width:100%;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.9rem;margin-bottom:10px;box-sizing:border-box;">
+      <label style="display:block;font-size:.85rem;margin-bottom:4px;">Base URL（直连 Anthropic 可留空）</label>
+      <input type="text" name="backup_base_url"
+             value="{{ config.backup_base_url }}"
+             placeholder="留空则使用 https://api.anthropic.com"
+             style="width:100%;padding:8px 12px;border:1px solid var(--border,#ddd);border-radius:6px;font-size:.9rem;box-sizing:border-box;">
+    </div>
+
+    <button type="submit"
+            style="width:100%;padding:11px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">
+      保存配置
+    </button>
+  </form>
+
+  <p style="margin-top:16px;font-size:.8rem;color:var(--text3,#999);">
+    留空的字段不会覆盖现有值。环境变量 ANTHROPIC_API_KEY / ANTHROPIC_BASE_URL 作为兜底。
+  </p>
+</div>
+{% endblock %}

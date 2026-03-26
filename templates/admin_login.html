@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}管理后台登录{% endblock %}
+{% block body %}
+<div style="max-width:360px;margin:80px auto;padding:0 20px;">
+  <h2 style="margin-bottom:24px;font-size:1.2rem;">管理后台</h2>
+  {% if error %}
+  <p style="color:#e55;margin-bottom:16px;">{{ error }}</p>
+  {% endif %}
+  <form method="POST">
+    <input type="password" name="password" placeholder="管理密码"
+           style="width:100%;padding:10px 14px;border:1px solid var(--border,#ddd);border-radius:8px;font-size:1rem;margin-bottom:12px;box-sizing:border-box;">
+    <button type="submit"
+            style="width:100%;padding:10px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">
+      登录
+    </button>
+  </form>
+</div>
+{% endblock %}

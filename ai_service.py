@@ -2,7 +2,7 @@
 Multi-model AI service for AI深度决策.
 
 Models used:
-- 豆包 Lite (字节跳动): SOP conversation guidance (cheap)
+- GLM-5 (智谱 AI): SOP conversation guidance
 - Claude claude-opus-4-6 (Anthropic): Step 2, Step 4, Step 5
 - GPT-5.4 via Qiniu relay (openai/gpt-5.4): Step 3, fallback to Claude Sonnet
 - 讯飞 STT: speech-to-text (placeholder)
@@ -81,36 +81,26 @@ def _get_doubao_client() -> OpenAI:
 
 def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
     """
-    Stream SOP conversation response token by token via Claude Haiku.
+    Stream SOP conversation response via GLM-5 (Zhipu AI).
     messages: list of {"role": ..., "content": ...} including system message.
-    Yields text chunks. Automatically falls back to backup key on failure.
+    Yields text chunks.
     """
-    model = os.environ.get("SOP_MODEL", "claude-haiku-4-5-20251001")
-
-    system_content = ""
-    conv_messages = []
-    for m in messages:
-        if m["role"] == "system":
-            system_content = m["content"]
-        else:
-            conv_messages.append(m)
-
-    def _stream(client):
-        chunks = []
-        with client.messages.stream(
-            model=model,
-            max_tokens=300,
-            system=system_content,
-            messages=conv_messages,
-        ) as stream:
-            for text in stream.text_stream:
-                chunks.append(text)
-        return chunks
+    model = os.environ.get("SOP_MODEL", "glm-4-flash")
+    api_key = os.environ.get("ZHIPU_API_KEY", "")
+    base_url = "https://open.bigmodel.cn/api/paas/v4/"
 
     try:
-        chunks = _anthropic_call_with_fallback(_stream)
-        for chunk in chunks:
-            yield chunk
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        stream = client.chat.completions.create(
+            model=model,
+            max_tokens=300,
+            messages=messages,
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
     except Exception as e:
         yield f"\n（抱歉，网络出现了小问题，请重试。错误：{e}）"
 

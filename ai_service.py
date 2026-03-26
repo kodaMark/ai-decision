@@ -85,9 +85,9 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
     messages: list of {"role": ..., "content": ...} including system message.
     Yields text chunks.
     """
-    model = os.environ.get("SOP_MODEL", "glm-4-flash")
-    api_key = os.environ.get("ZHIPU_API_KEY", "")
-    base_url = "https://open.bigmodel.cn/api/paas/v4/"
+    model = os.environ.get("SOP_MODEL", "openai/gpt-5.4-mini")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
     try:
         client = OpenAI(api_key=api_key, base_url=base_url)

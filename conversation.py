@@ -187,20 +187,23 @@ class ConversationSOP:
             )
         else:
             force_next = followup_count >= 2 or current_q["step"] == 9
-            extra_instruction = (
-                f"当前需要引导用户回答的问题方向：{current_q['glm_prompt']}\n"
-                f"这是第{current_q['step']}个问题（共9个）。\n"
-                f"当前已对此问题追问了 {followup_count} 次。\n"
-            )
-            if force_next:
-                extra_instruction += (
-                    "已达到最大追问次数，无论用户回答是否具体，"
-                    "都必须在回复开头加 [NEXT] 并推进到下一个问题。\n"
-                )
             if not conversation_history:
-                extra_instruction += "这是第一条消息，先热情地打招呼，然后问第一个问题。"
+                extra_instruction = "这是对话的开始，先热情打招呼，然后问第一个问题。"
+            elif force_next:
+                extra_instruction = (
+                    f"【强制指令】无论用户回答是否完整，你必须：\n"
+                    f"1. 在回复开头加 [NEXT]\n"
+                    f"2. 用温暖的语气过渡\n"
+                    f"3. 接着问且只问这一个问题：「{current_q['question']}」\n"
+                    f"禁止问其他任何问题，禁止出现第二个问号。"
+                )
             else:
-                extra_instruction += "根据答案质量决定是否加 [NEXT]，参考系统提示中的判断标准。\n【本条强制】你的回复里只能出现一个问号，违反此规则视为错误输出。"
+                extra_instruction = (
+                    f"【当前任务】判断用户的回答是否足够具体：\n"
+                    f"- 如果具体：在回复开头加 [NEXT]，然后问且只问这一个问题：「{current_q['question']}」\n"
+                    f"- 如果模糊：不加 [NEXT]，针对「{current_q['question']}」这个话题追问一个具体的细节\n"
+                    f"禁止问其他话题，禁止出现两个或以上的问号。"
+                )
 
         system = SYSTEM_PROMPT_GLM + "\n\n[当前引导指令]\n" + extra_instruction
 

@@ -343,8 +343,8 @@ def debug_quick_test():
 @app.route("/debug/raw/<int:session_id>")
 def debug_raw(session_id: int):
     """Dump raw step4/step5 JSON from DB for diagnosis."""
-    from models import AnalysisReport
-    report = AnalysisReport.query.filter_by(session_id=session_id).first()
+    from models import DecisionReport
+    report = DecisionReport.query.filter_by(session_id=session_id).first()
     if not report:
         return {"error": "report not found"}, 404
     return {

@@ -847,20 +847,21 @@ def _parse_json_safe(raw_text: str, default_key: str = "raw", label: str = "") -
     If it fails, wrap the raw text in a dict under default_key.
     Strips markdown code fences if present.
     """
-    # Strip ```json ... ``` fences
     text = raw_text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
+    # Strip ```json ... ``` fences (handle optional newline after fence marker)
+    text = re.sub(r"^```(?:json)?\n?", "", text)
+    text = re.sub(r"\n?```$", "", text)
     text = text.strip()
 
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Try to find JSON object within the text
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
+        # Extract from first { to last }
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
             try:
-                return json.loads(match.group())
+                return json.loads(text[start:end])
             except json.JSONDecodeError:
                 pass
     return {default_key: raw_text, "_parse_error": f"{label}: JSON parse failed"}

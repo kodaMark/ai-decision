@@ -97,17 +97,30 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
             messages=messages,
             stream=True,
         )
+        buffer = ""
+        done = False
         for chunk in stream:
+            if done:
+                break
             delta = chunk.choices[0].delta.content
             if delta:
-                yield delta
+                buffer += delta
+                if "？" in buffer:
+                    cut = buffer.index("？") + 1
+                    yield buffer[:cut]
+                    done = True
+                else:
+                    yield delta
     except Exception as e:
         yield f"\n（抱歉，网络出现了小问题，请重试。错误：{e}）"
 
 
 def chat_with_glm(messages: list) -> str:
     """Non-streaming call, returns full response string."""
-    return "".join(chat_with_glm_stream(messages))
+    full = "".join(chat_with_glm_stream(messages))
+    if "？" in full:
+        full = full[: full.index("？") + 1]
+    return full
 
 
 # ---------------------------------------------------------------------------

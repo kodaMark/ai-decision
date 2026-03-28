@@ -314,7 +314,7 @@ def run_step4_claude(collected_info: str, step2_result: dict, step3_result: dict
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2500,
+        max_tokens=4000,
         system=STEP4_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -388,7 +388,7 @@ def run_step5_claude(
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=3000,
+        max_tokens=4000,
         system=STEP5_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )

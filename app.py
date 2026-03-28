@@ -340,6 +340,19 @@ def debug_quick_test():
     return redirect(url_for("debug_status", session_id=ds.id))
 
 
+@app.route("/debug/raw/<int:session_id>")
+def debug_raw(session_id: int):
+    """Dump raw step4/step5 JSON from DB for diagnosis."""
+    from models import AnalysisReport
+    report = AnalysisReport.query.filter_by(session_id=session_id).first()
+    if not report:
+        return {"error": "report not found"}, 404
+    return {
+        "step4_raw": report.step4_raw,
+        "step5_raw": report.step5_raw,
+    }
+
+
 @app.route("/debug/status/<int:session_id>")
 def debug_status(session_id: int):
     """简单状态页，轮询分析进度并显示完整错误信息。"""

@@ -98,6 +98,7 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
             stream=True,
         )
         buffer = ""
+        yielded = 0
         done = False
         for chunk in stream:
             if done:
@@ -107,19 +108,44 @@ def chat_with_glm_stream(messages: list) -> Generator[str, None, None]:
                 buffer += delta
                 if "？" in buffer:
                     cut = buffer.index("？") + 1
-                    yield buffer[:cut]
+                    remaining = buffer[yielded:cut]
+                    if remaining:
+                        yield remaining
                     done = True
                 else:
                     yield delta
+                    yielded += len(delta)
     except Exception as e:
         yield f"\n（抱歉，网络出现了小问题，请重试。错误：{e}）"
 
 
+def _is_off_script(text: str) -> bool:
+    """检测回复是否跑偏：包含 markdown 列表/加粗，或问号前内容超过200字。"""
+    import re
+    if re.search(r"(\d+\.\s|\*\*|^-\s)", text, re.MULTILINE):
+        return True
+    q_pos = text.find("？")
+    if q_pos > 200:
+        return True
+    return False
+
+
 def chat_with_glm(messages: list) -> str:
-    """Non-streaming call, returns full response string."""
+    """Non-streaming call, returns full response string. Retries once if off-script."""
     full = "".join(chat_with_glm_stream(messages))
     if "？" in full:
         full = full[: full.index("？") + 1]
+    if _is_off_script(full):
+        # 加强指令后重试一次
+        retry_messages = list(messages)
+        retry_messages[-1] = dict(retry_messages[-1])
+        retry_messages[0] = {
+            "role": "system",
+            "content": messages[0]["content"] + "\n\n【重要】只问一个问题，不要分析或给建议，不要使用列表格式。",
+        }
+        full = "".join(chat_with_glm_stream(retry_messages))
+        if "？" in full:
+            full = full[: full.index("？") + 1]
     return full
 
 

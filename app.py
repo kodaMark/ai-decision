@@ -165,48 +165,37 @@ def session_message(session_id: int):
     glm_messages = sop.build_glm_messages(history, followup_count=followup_count)
 
     def generate():
-        full_response = []
         yield "data: " + json.dumps({"type": "start"}) + "\n\n"
 
-        chunk_queue: queue.Queue = queue.Queue()
+        result_holder = {}
 
-        def fetch_stream():
+        def fetch_full():
             try:
-                for chunk in chat_with_glm_stream(glm_messages):
-                    chunk_queue.put(("chunk", chunk))
+                result_holder["text"] = chat_with_glm(glm_messages)
             except Exception as e:
-                chunk_queue.put(("error", str(e)))
-            finally:
-                chunk_queue.put(("done", None))
+                result_holder["error"] = str(e)
 
-        threading.Thread(target=fetch_stream, daemon=True).start()
+        t = threading.Thread(target=fetch_full, daemon=True)
+        t.start()
+        # keepalive pings while waiting
+        while t.is_alive():
+            t.join(timeout=10)
+            if t.is_alive():
+                yield ": ping\n\n"
 
-        error_occurred = False
-        while True:
-            try:
-                item_type, item_value = chunk_queue.get(timeout=10)
-            except queue.Empty:
-                yield ": ping\n\n"  # keepalive，防止 Railway 代理30秒空闲断连
-                continue
-
-            if item_type == "chunk":
-                full_response.append(item_value)
-                display_chunk = item_value.replace("[NEXT]", "").lstrip()
-                if display_chunk:
-                    yield "data: " + json.dumps({"type": "chunk", "content": display_chunk}) + "\n\n"
-            elif item_type == "error":
-                yield "data: " + json.dumps({"type": "error", "message": item_value}) + "\n\n"
-                error_occurred = True
-                break
-            elif item_type == "done":
-                break
-
-        if error_occurred:
+        if "error" in result_holder:
+            yield "data: " + json.dumps({"type": "error", "message": result_holder["error"]}) + "\n\n"
             return
 
-        assistant_text = "".join(full_response)
+        assistant_text = result_holder.get("text", "")
         advanced = "[NEXT]" in assistant_text
         clean_text = assistant_text.replace("[NEXT]", "").lstrip()
+
+        # 模拟流式输出（每次10个字符）
+        chunk_size = 10
+        for i in range(0, len(clean_text), chunk_size):
+            chunk = clean_text[i:i + chunk_size]
+            yield "data: " + json.dumps({"type": "chunk", "content": chunk}) + "\n\n"
 
         with app.app_context():
             # If GLM approved the answer, mark user message with the step
